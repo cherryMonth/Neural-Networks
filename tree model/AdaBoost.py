@@ -4,7 +4,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 """
 sklearn 自带的手写数字数据集
-数字是以如下形式的二维矩阵，标签即为矩阵所代表的数字
+数字是以如下形式的二维矩阵(维度为1024 * 1024)，标签即为矩阵所代表的数字
 
 [010]
 [010]  - > 数字1

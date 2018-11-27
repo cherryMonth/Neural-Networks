@@ -9,6 +9,9 @@ import matplotlib
 
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set()
 
 
 class _LSTMModel(ts_model.SequentialTimeSeriesModel):
@@ -171,8 +174,8 @@ if __name__ == '__main__':
 
     plt.figure(figsize=(15, 5))
     plt.axvline(999, linestyle="dotted", linewidth=4, color='r')
-    observed_lines = plt.plot(observed_times, observed, label="observation", color="k")
-    evaluated_lines = plt.plot(evaluated_times, evaluated, label="evaluation", color="g")
+    observed_lines = plt.plot(observed_times, observed, label="observation", color="b")
+    evaluated_lines = plt.plot(evaluated_times, evaluated, label="evaluation", color="y")
     predicted_lines = plt.plot(predicted_times, predicted, label="prediction", color="r")
     plt.legend(handles=[observed_lines[0], evaluated_lines[0], predicted_lines[0]],
                loc="upper left")

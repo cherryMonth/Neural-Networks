@@ -1,52 +1,66 @@
-import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.neighbors import LocalOutlierFactor
+import seaborn as sns
 
-np.random.seed(42)
+sns.set()
+"""
+数据集是计算机的监控数据，主要包含两个特征Latency(延迟)和Throughput(吞吐量)，目标为是否是异常数据: 0为假，1为真。
+"""
 
-# Generate train data
-X = 0.3 * np.random.randn(100, 2)
-# Generate some abnormal novel observations
-X_outliers = np.random.uniform(low=-4, high=4, size=(20, 2))
-X = np.r_[X + 2, X - 2, X_outliers]  # 行连接 shape(220,2)
+X_train = pd.read_csv('X_train.csv')
+X_test = pd.read_csv('X_test.csv')
+Y_test = pd.read_csv('Y_test.csv')
 
 # fit the model
 clf = LocalOutlierFactor(n_neighbors=20)
-y_pred = clf.fit_predict(X)  # 预测为1则为正常样本，-1为异常样本
-outlier = []
-for i, j in enumerate(y_pred):
+clf.fit(X_train)
+
+normal_index = list()
+abnormal_index = list()
+y_pred_test = clf.fit_predict(X_test)  # 对样本的预测结果为1则说明为正常值，为-1表示为异常值
+for i, j in enumerate(y_pred_test):
     if j == 1:
-        outlier.append(i)  # 获取所有正常样本
+        normal_index.append(i)  # 存储正常样本的索引
+    else:
+        abnormal_index.append(i)  # 存储异常样本的索引
 
-y_pred_outliers = y_pred[200:]
+normal_series = X_test.loc[normal_index]  # 获取对应样本集合
+abnormal_series = X_test.loc[abnormal_index]
 
-# plot the level sets of the decision function
-xx, yy = np.meshgrid(np.linspace(-5, 5, 50), np.linspace(-5, 5, 50))
-Z = clf._decision_function(np.c_[xx.ravel(), yy.ravel()])  # 画出决策边界
+real_normal_index = list()
+real_abnormal_index = list()
+for i, j in enumerate(np.array(Y_test)):
+    if j == 0:  # 真实样本0为正常，1为异常
+        real_normal_index.append(i)  # 存储真实正常样本的索引
+    else:
+        real_abnormal_index.append(i)  # 存储真实异常样本的索引
+
+real_normal_series = X_test.loc[real_normal_index]  # 获取对应样本集合
+real_abnormal_series = X_test.loc[real_abnormal_index]
+
+# 此处是相对于两个向量之间做叉乘，变成一个二维平面的各个点的坐标
+# 向量就是根据各个特征的最大最小值然后平均划分点得到的
+x_series = np.linspace(np.min(X_test['Latency']) - 2, np.max(X_test['Latency']) + 2, 50)
+y_series = np.linspace(np.min(X_test['Throughput']) - 2, np.max(X_test['Throughput']) + 2, 50)
+xx, yy = np.meshgrid(x_series, y_series)
+Z = clf._decision_function(np.c_[xx.ravel(), yy.ravel()])
 Z = Z.reshape(xx.shape)
 
-# 画出正常样本和异常样本分布
+# 接下来画等高线
 plt.subplot(211)
-plt.title("Local Outlier Factor (LOF)")
-plt.contourf(xx, yy, Z, cmap=plt.cm.Blues_r)  # 决策出不同区域用不同颜色
+plt.title("predict LOF")
+plt.contourf(xx, yy, Z, cmap=plt.cm.Blues_r)
 
-a = plt.scatter(X[:200, 0], X[:200, 1], c='white',
-                edgecolor='k', s=20)
-b = plt.scatter(X[200:, 0], X[200:, 1], c='red',
-                edgecolor='k', s=20)
-plt.legend([a, b],
-           ["normal observations",
-            "abnormal observations"],
-           loc="upper left")
+b1 = plt.scatter(normal_series['Latency'], normal_series['Throughput'], c='white', s=20, edgecolor='k')
+c = plt.scatter(abnormal_series['Latency'], abnormal_series['Throughput'], c='red', s=20, edgecolor='k')
 
-# 画出去除LOF预测为异常样本后剩下的样本分布
 plt.subplot(212)
-plt.title("remove noise samples")
-plt.contourf(xx, yy, Z, cmap=plt.cm.Blues_r)  # 决策出不同区域用不同颜色
-plt.scatter(X[:200, 0], X[:200, 1], c='white', edgecolor='k', s=20)
+plt.title("real LOF")
+plt.contourf(xx, yy, Z, cmap=plt.cm.Blues_r)
 
-plt.axis('tight')
-plt.xlim((-5, 5))
-plt.ylim((-5, 5))
+b2 = plt.scatter(real_normal_series['Latency'], real_normal_series['Throughput'], c='white', s=20, edgecolor='k')
+c2 = plt.scatter(real_abnormal_series['Latency'], real_abnormal_series['Throughput'], c='red', s=20, edgecolor='k')
 
 plt.show()

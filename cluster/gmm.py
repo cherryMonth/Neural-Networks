@@ -1,21 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-np.random.seed(37)  # 使得每次运行得到的随机数都一样
+import seaborn as sns
+sns.set()
 
 # 准备数据集
 data_path = 'data\Wholesale customers data.csv'
 
-"""
-每个特征为某种商品的年花费
-"""
-
 df = pd.read_csv(data_path)
 print(df.info())  # 查看数据信息，确保没有错误
-# print('-'*100)
 dataset = df.values  # 数据加载没有问题
-# print(dataset.shape) # ((441, 8)
 dataset = dataset[:, 2:]  # 本项目只需要后面的6列features即可
 col_names = df.columns.tolist()[2:]
 print(col_names)
@@ -25,7 +19,6 @@ def visual_cluster_effect(cluster, dataset, title, col_id):
     assert isinstance(col_id, list) and len(col_id) == 2, 'col_id must be list type and length must be 2'
 
     labels = gmm.predict(dataset)  # 每一个样本对应的簇群号码
-    #     print(labels.shape) # (440,) 440个样本
     markers = ['.', ',', 'o', 'v', '^', '<', '>', '1', '2', '3', '4', '8'
         , 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|']
     colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
@@ -49,6 +42,7 @@ def visual_cluster_effect(cluster, dataset, title, col_id):
     plt.ylabel('feature_1')
     plt.show()
 
+
 """
 print(gmmModel.means_)  中心蔟
 print(gmmModel.covariances_)  样本协方差矩阵
@@ -66,7 +60,7 @@ print('\t'.join([col_name[:5] for col_name in col_names]))
 for centroid in centroids:
     print('\t'.join(str(int(x)) for x in centroid))
 visual_cluster_effect(gmm, dataset, 'MeanShift-X=fresh,y=milk', [0, 1])  # X=fresh， y=milk
-# 使用轮廓系数评估模型的优虐
+# 使用轮廓系数评估模型的优劣
 from sklearn.metrics import silhouette_score
 
 si_score = silhouette_score(dataset, labels,

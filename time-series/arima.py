@@ -1,6 +1,7 @@
 import matplotlib
-
 matplotlib.use('agg')
+import seaborn as sns
+sns.set()
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
@@ -16,7 +17,7 @@ def main(_):
         data = sess.run(data)
         coord.request_stop()
 
-    ar = tf.contrib.timeseries.ARRegressor(
+    ar = tf.contrib.timeseries.ARRegressor(  # 定义AR模型，损失函数为极大似然函数
         periodicities=100, input_window_size=10, output_window_size=6,
         num_features=1,
         loss=tf.contrib.timeseries.ARModel.NORMAL_LIKELIHOOD_LOSS)

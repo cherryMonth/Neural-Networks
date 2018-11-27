@@ -3,6 +3,14 @@ from sklearn import linear_model
 from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
 import numpy as np
+import seaborn as sns
+
+sns.set()
+
+"""
+年龄，性别，体质指数，血压，(六种血清的化验数据) 10个特征
+预测目标为病情指数
+"""
 
 diabetes = load_diabetes()
 X = diabetes['data'][:, np.newaxis, 2]

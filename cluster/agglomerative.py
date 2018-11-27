@@ -1,21 +1,22 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-np.random.seed(37)  # 使得每次运行得到的随机数都一样
+sns.set()
 
 # 准备数据集
 data_path = 'data\Wholesale customers data.csv'
 
 """
 每个特征为某种商品的年花费
+此处我们对买新鲜产品和牛奶的用户进行划分
+然后对比其他两种聚类方法，分析各种算法的优劣
 """
 
 df = pd.read_csv(data_path)
 print(df.info())  # 查看数据信息，确保没有错误
-# print('-'*100)
 dataset = df.values  # 数据加载没有问题
-# print(dataset.shape) # ((441, 8)
 dataset = dataset[:, 2:]  # 本项目只需要后面的6列features即可
 col_names = df.columns.tolist()[2:]
 print(col_names)
@@ -50,14 +51,16 @@ def visual_cluster_effect(cluster, dataset, title, col_id):
 from sklearn.cluster import AgglomerativeClustering
 
 agg = AgglomerativeClustering(n_clusters=3)
-agg.fit(dataset)  # 使用评估的带宽构建均值漂移模型，并进行训练
+agg.fit(dataset)  # 使用层次聚类模型，并进行训练
 labels = agg.labels_
 cluster_num = len(np.unique(labels))  # 生成聚类标签
+
 # 下面打印出簇群种类
 print('Number of Clusters: {}'.format(cluster_num))
 print('\t'.join([col_name[:5] for col_name in col_names]))
 visual_cluster_effect(agg, dataset, 'MeanShift-X=fresh,y=milk', [0, 1])  # X=fresh， y=milk
-# 使用轮廓系数评估模型的优虐
+
+# 使用轮廓系数评估模型的优劣
 from sklearn.metrics import silhouette_score
 
 si_score = silhouette_score(dataset, agg.labels_,
