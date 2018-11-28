@@ -44,7 +44,9 @@ def visual_cluster_effect(cluster, dataset, title, col_id):
     # 将中心点绘制到图中
     plt.title(title)
     plt.xlabel('feature_0')
+    plt.savefig('agglomerative.png')
     plt.ylabel('feature_1')
+
     plt.show()
 
 

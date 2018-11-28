@@ -1,4 +1,4 @@
-import numpy as np
+import pandas as pd
 import tensorflow as tf
 
 from tensorflow.contrib.timeseries.python.timeseries import estimators as ts_estimators
@@ -15,7 +15,7 @@ sns.set()
 
 
 class _LSTMModel(ts_model.SequentialTimeSeriesModel):
-    """A time series model-building example using an RNNCell."""
+    """使用RNNCell的时间序列模型构建示例"""
 
     def __init__(self, num_units, num_features, dtype=tf.float32):
         """Initialize/configure the model object.
@@ -54,7 +54,6 @@ class _LSTMModel(ts_model.SequentialTimeSeriesModel):
             name_="lstm_cell",
             func_=self._lstm_cell,
             create_scope_now_=True)
-        # Transforms LSTM output into mean predictions.
         self._predict_from_lstm_output = tf.make_template(
             name_="predict_from_lstm_output",
             func_=lambda inputs: tf.layers.dense(inputs=inputs, units=self.num_features),
@@ -139,19 +138,17 @@ class _LSTMModel(ts_model.SequentialTimeSeriesModel):
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
-    x = np.array(range(1000))
-    noise = np.random.uniform(-0.2, 0.2, 1000)
-    y = np.sin(np.pi * x / 50) + np.cos(np.pi * x / 50) + np.sin(np.pi * x / 25) + noise
+    csv_data = pd.read_csv('data/data.csv', header=None, names=['times', 'values'])
 
     data = {
-        tf.contrib.timeseries.TrainEvalFeatures.TIMES: x,
-        tf.contrib.timeseries.TrainEvalFeatures.VALUES: y,
+        tf.contrib.timeseries.TrainEvalFeatures.TIMES: csv_data['times'],
+        tf.contrib.timeseries.TrainEvalFeatures.VALUES: csv_data['values'],
     }
 
     reader = NumpyReader(data)
 
     train_input_fn = tf.contrib.timeseries.RandomWindowInputFn(
-        reader, batch_size=4, window_size=100)
+        reader, batch_size=4, window_size=200)
 
     estimator = ts_estimators.TimeSeriesRegressor(
         model=_LSTMModel(num_features=1, num_units=128),
@@ -160,10 +157,11 @@ if __name__ == '__main__':
     estimator.train(input_fn=train_input_fn, steps=2000)
     evaluation_input_fn = tf.contrib.timeseries.WholeDatasetInputFn(reader)
     evaluation = estimator.evaluate(input_fn=evaluation_input_fn, steps=1)
-    # Predict starting after the evaluation
+
+    # 为了与AR模型相比较，此处预测长度与AR保持一致，为250
     (predictions,) = tuple(estimator.predict(
         input_fn=tf.contrib.timeseries.predict_continuation_input_fn(
-            evaluation, steps=200)))
+            evaluation, steps=250)))
 
     observed_times = evaluation["times"][0]
     observed = evaluation["observed"][0, :, :]
@@ -173,7 +171,9 @@ if __name__ == '__main__':
     predicted = predictions["mean"]
 
     plt.figure(figsize=(15, 5))
-    plt.axvline(999, linestyle="dotted", linewidth=4, color='r')
+
+    # 此处为图像分割线，之后开始显示预期数据
+    plt.axvline(500, linestyle="dotted", linewidth=4, color='r')
     observed_lines = plt.plot(observed_times, observed, label="observation", color="b")
     evaluated_lines = plt.plot(evaluated_times, evaluated, label="evaluation", color="y")
     predicted_lines = plt.plot(predicted_times, predicted, label="prediction", color="r")

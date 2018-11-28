@@ -40,6 +40,7 @@ def visual_cluster_effect(cluster, dataset, title, col_id):
     plt.title(title)
     plt.xlabel('feature_0')
     plt.ylabel('feature_1')
+    plt.savefig('k-means.png')
     plt.show()
 
 

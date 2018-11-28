@@ -5,6 +5,9 @@ sns.set()
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
+"""
+给定500个时间序列以及对应的value，预测未来250个时间序列的情况。
+"""
 
 def main(_):
     csv_file_name = 'data/data.csv'
@@ -33,6 +36,9 @@ def main(_):
             evaluation, steps=250)))
 
     plt.figure(figsize=(15, 5))
+
+    # 此处为图像分割线，之后开始显示预期数据
+    plt.axvline(500, linestyle="dotted", linewidth=4, color='r')
     plt.plot(data['times'].reshape(-1), data['values'].reshape(-1), label='origin')
     plt.plot(evaluation['times'].reshape(-1), evaluation['mean'].reshape(-1), label='evaluation')
     plt.plot(predictions['times'].reshape(-1), predictions['mean'].reshape(-1), label='prediction')

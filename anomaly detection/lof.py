@@ -6,12 +6,13 @@ import seaborn as sns
 
 sns.set()
 """
-数据集是计算机的监控数据，主要包含两个特征Latency(延迟)和Throughput(吞吐量)，目标为是否是异常数据: 0为假，1为真。
+数据集是计算机的监控数据，主要包含两个特征Latency(延迟)和Throughput(吞吐量)
+目标为是否是异常数据: 0为假，1为真。
 """
 
-X_train = pd.read_csv('X_train.csv')
-X_test = pd.read_csv('X_test.csv')
-Y_test = pd.read_csv('Y_test.csv')
+X_train = pd.read_csv('data/X_train.csv')
+X_test = pd.read_csv('data/X_test.csv')
+Y_test = pd.read_csv('data/Y_test.csv')
 
 # fit the model
 clf = LocalOutlierFactor(n_neighbors=20)
@@ -62,5 +63,6 @@ plt.contourf(xx, yy, Z, cmap=plt.cm.Blues_r)
 
 b2 = plt.scatter(real_normal_series['Latency'], real_normal_series['Throughput'], c='white', s=20, edgecolor='k')
 c2 = plt.scatter(real_abnormal_series['Latency'], real_abnormal_series['Throughput'], c='red', s=20, edgecolor='k')
-
+plt.tight_layout(h_pad=1)
+plt.savefig('lof.png')
 plt.show()
