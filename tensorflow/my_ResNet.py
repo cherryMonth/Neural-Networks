@@ -1,4 +1,9 @@
-# coding=utf-8
+import collections
+import tensorflow as tf
+import keras
+from keras.datasets.cifar import load_batch
+from keras.datasets.cifar10 import load_data
+
 """
 
 Typical use:
@@ -20,8 +25,6 @@ ResNet-101 for semantic segmentation into 21 classes:
                                                 global_pool=False,
                                                 output_stride=16)
 """
-import collections
-import tensorflow as tf
 
 slim = tf.contrib.slim
 
@@ -443,6 +446,8 @@ def resnet_v2(inputs,
             # Convert end_points_collection into a dictionary of end_points.
             end_points = slim.utils.convert_collection_to_dict(end_points_collection)
             if num_classes is not None:
+                net = tf.squeeze(net, [1, 2], name='SpatialSqueeze')
+                net = slim.fully_connected(net, num_classes, activation_fn=None, scope='result')
                 end_points['predictions'] = slim.softmax(net, scope='predictions')
             return net, end_points
 
@@ -508,42 +513,53 @@ def resnet_v2_200(inputs,
                      include_root_block=True, reuse=reuse, scope=scope)
 
 
-if __name__ == '__main__':
-    from datetime import datetime
-    import math
-    import time
+def color_preprocessing(x_train, x_test):
+    x_train = x_train.astype('float32')
+    x_test = x_test.astype('float32')
+    mean = [125.307, 122.95, 113.865]
+    std = [62.9932, 62.0887, 66.7048]
+    for i in range(3):
+        x_train[:, :, :, i] = (x_train[:, :, :, i] - mean[i]) / std[i]
+        x_test[:, :, :, i] = (x_test[:, :, :, i] - mean[i]) / std[i]
+    return x_train, x_test
 
 
-    def time_tensorflow_run(session, target, info_string):
-        num_steps_burn_in = 10
-        total_duration = 0.0
-        total_duration_squared = 0.0
-
-        for i in range(num_batches + num_steps_burn_in):
-            start_time = time.time()
-            _ = session.run(target)
-            duration = time.time() - start_time
-            if i >= num_steps_burn_in:
-                if not i % 10:
-                    print('%s: step %d, duration = %.3f' %
-                          (datetime.now(), i - num_steps_burn_in, duration))
-                total_duration += duration
-                total_duration_squared += duration * duration
-        mn = total_duration / num_batches
-        vr = total_duration_squared / num_batches - mn * mn
-        sd = math.sqrt(vr)
-        print('%s: %s across %d steps, %.3f +/- %.3f sec / batch' %
-              (datetime.now(), info_string, num_batches, mn, sd))
+def scheduler(epoch):
+    if epoch < 81:
+        return 0.1
+    if epoch < 122:
+        return 0.01
+    return 0.001
 
 
-    batch_size = 32
-    height, width = 224, 224
-    inputs = tf.random_uniform((batch_size, height, width, 3))
-    with slim.arg_scope(resnet_arg_scope(is_training=False)):
-        net, end_points = resnet_v2_152(inputs, 1000)
+batch_size = 32
+import numpy as np
 
-    init = tf.global_variables_initializer()
-    sess = tf.Session()
-    sess.run(init)
-    num_batches = 100
-    time_tensorflow_run(sess, net, "Forward")
+(x_train, y_train), (x_test, y_test) = load_data()  # 50000, 32,32,3
+y_train = np.array(keras.utils.to_categorical(y_train, 10).tolist())
+y_test = np.array(keras.utils.to_categorical(y_test, 10).tolist())
+x_train, x_test = color_preprocessing(x_train, x_test)
+x = tf.placeholder(tf.float32, [None, 32, 32, 3])
+y = tf.placeholder(tf.float32, [None, 10])
+
+with slim.arg_scope(resnet_arg_scope(is_training=False)):
+    net, end_points = resnet_v2_152(x, 10)  # 分辨率会缩小32倍
+
+y_pred = end_points['predictions']
+cross_entropy = -tf.reduce_sum(y * tf.log(y_pred))
+optimizer = tf.train.AdamOptimizer().minimize(cross_entropy)
+correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
+
+init = tf.global_variables_initializer()
+sess = tf.Session()
+sess.run(init)
+n_epochs = 5
+
+for epoch_i in range(n_epochs):
+    train_accuracy = 0
+    for k in range(len(x_train) // batch_size):
+        result = sess.run([optimizer, accuracy],
+                          feed_dict={x: x_train[k * batch_size:(k + 1) * batch_size],
+                                     y: y_train[k * batch_size:(k + 1) * batch_size]})
+        print(result)
