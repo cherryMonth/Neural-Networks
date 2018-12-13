@@ -1,23 +1,17 @@
 import collections
 import tensorflow as tf
 import keras
-from keras.datasets.cifar import load_batch
 from keras.datasets.cifar10 import load_data
+import sys
 
 """
-
 Typical use:
-
    from tensorflow.contrib.slim.nets import resnet_v2
-
 ResNet-101 for image classification into 1000 classes:
-
    # inputs has shape [batch, 224, 224, 3]
    with slim.arg_scope(resnet_v2.resnet_arg_scope(is_training)):
       net, end_points = resnet_v2.resnet_v2_101(inputs, 1000)
-
 ResNet-101 for semantic segmentation into 21 classes:
-
    # inputs has shape [batch, 513, 513, 3]
    with slim.arg_scope(resnet_v2.resnet_arg_scope(is_training)):
       net, end_points = resnet_v2.resnet_v2_101(inputs,
@@ -34,21 +28,16 @@ class Block(collections.namedtuple('Block', ['scope', 'unit_fn', 'args'])):
     使用collections.namedtuple设计ResNet基本的Block模块组的named tuple
         只包含数据结构,包含具体方法
     需要传入三个参数[scope,unit_fn,args]
-
      以Block('block1',bottleneck,[(256,64,1)]x2 + [(256,64,2)])为例
      scope = 'block1' 这个Block的名称就是block1
-
      unit_fn = bottleneck,  就是ResNet的残差学习单元
-
      args = [(256,64,1)]x2 + [(256,64,2)]
      args是一个列表,每个元素都对应一个bottleneck残差学习单元
      前面两个元素都是(256,64,1),后一个元素是(256,64,2)
      每个元素都是一个三元的tuple,代表(depth,depth_bottleneck,stride)
      例如(256,64,2)代表构建的bottleneck残差学习单元(每个残差学习单元里面有三个卷积层)中,
      第三层输出通道数depth为256,前两层输出通道数depth_bottleneck为64,且中间层的步长stride为2.
-
      这个残差学习单元的结构为[(1x1/s1,64),(3x3/s2,64),(1x1/s1,256)]
-
     整个block1中有三个bottleneck残差学习单元,结构为
     [(1x1/s1,64),(3x3/s2,64),(1x1/s1,256)]
     [(1x1/s1,64),(3x3/s2,64),(1x1/s1,256)]
@@ -76,12 +65,10 @@ def subsample(inputs, factor, scope=None):
     :return:
     '''
     """Subsamples the input along the spatial dimensions.
-
     Args:
       inputs: A `Tensor` of size [batch, height_in, width_in, channels].
       factor: The subsampling factor.
       scope: Optional variable_scope.
-
     Returns:
       output: A `Tensor` of size [batch, height_out, width_out, channels] with the
         input, either intact (if factor == 1) or subsampled (if factor > 1).
@@ -107,26 +94,17 @@ def conv2d_same(inputs, num_outputs, kernel_size, stride, scope=None):
     """
 
     """Strided 2-D convolution with 'SAME' padding.
-
     When stride > 1, then we do explicit zero-padding, followed by conv2d with
     'VALID' padding.
-
     Note that
-
        net = conv2d_same(inputs, num_outputs, 3, stride=stride)
-
     is equivalent to
-
        net = slim.conv2d(inputs, num_outputs, 3, stride=1, padding='SAME')
        net = subsample(net, factor=stride)
-
     whereas
-
        net = slim.conv2d(inputs, num_outputs, 3, stride=stride, padding='SAME')
-
     is different when the input's height or width is even, which is why we add the
     current function. For more details, see ResnetUtilsTest.testConv2DSameEven().
-
     Args:
       inputs: A 4-D tensor of size [batch, height_in, width_in, channels].
       num_outputs: An integer, the number of output filters.
@@ -134,7 +112,6 @@ def conv2d_same(inputs, num_outputs, kernel_size, stride, scope=None):
       stride: An integer, the output stride.
       rate: An integer, rate for atrous convolution.
       scope: Scope.
-
     Returns:
       output: A 4-D tensor of size [batch, height_out, width_out, channels] with
         the convolution output.
@@ -172,23 +149,17 @@ def stack_blocks_dense(net, blocks,
         在第二层,我们拿到每个Blocks中的Residual Unit的args,并展开
         再使用unit_fn残差学习单元生成函数顺序地创建并连接所有的残差学习单元
         最后,我们使用slim.utils.collect_named_outputs函数将输出net添加到collection
-
     '''
     """Stacks ResNet `Blocks` and controls output feature density.
-
     First, this function creates scopes for the ResNet in the form of
     'block_name/unit_1', 'block_name/unit_2', etc.
-
-
     Args:
       net: A `Tensor` of size [batch, height, width, channels].
       blocks: A list of length equal to the number of ResNet `Blocks`. Each
         element is a ResNet `Block` object describing the units in the `Block`.
       outputs_collections: Collection to add the ResNet block outputs.
-
     Returns:
       net: Output tensor
-
     """
     for block in blocks:
         with tf.variable_scope(block.scope, 'block', [net]) as sc:  # 根据block的名字返回对于的变量
@@ -229,12 +200,10 @@ def resnet_arg_scope(is_training=True,
     :return:
     '''
     """Defines the default ResNet arg scope.
-
     TODO(gpapan): The batch-normalization related default values above are
       appropriate for use in conjunction with the reference ResNet models
       released at https://github.com/KaimingHe/deep-residual-networks. When
       training ResNets from scratch, they might need to be tuned.
-
     Args:
       is_training: Whether or not we are training the parameters in the batch
         normalization layers of the model.
@@ -245,7 +214,6 @@ def resnet_arg_scope(is_training=True,
         normalizing activations by their variance in batch normalization.
       batch_norm_scale: If True, uses an explicit `gamma` multiplier to scale the
         activations in the batch normalization layer.
-
     Returns:
       An `arg_scope` to use for the resnet models.
     """
@@ -297,14 +265,11 @@ def bottleneck(inputs, depth, depth_bottleneck, stride,
     :return:
     '''
     """Bottleneck residual unit variant with BN before convolutions.
-
     This is the full preactivation residual unit variant proposed in [2]. See
     Fig. 1(b) of [2] for its definition. Note that we use here the bottleneck
     variant which has an extra bottleneck layer.
-
     When putting together two consecutive ResNet blocks that use this unit, one
     should use stride = 2 in the last unit of the first block.
-
     Args:
       inputs: A tensor of size [batch, height, width, channels].
       depth: The depth of the ResNet unit output.
@@ -314,7 +279,6 @@ def bottleneck(inputs, depth, depth_bottleneck, stride,
       rate: An integer, rate for atrous convolution.
       outputs_collections: Collection to add the ResNet unit output.
       scope: Optional variable_scope.
-
     Returns:
       The ResNet unit's output.
     """
@@ -371,7 +335,6 @@ def resnet_v2(inputs,
               reuse=None,
               scope=None):
     '''
-
     :param inputs:
     :param blocks:
     :param num_classes:
@@ -382,12 +345,9 @@ def resnet_v2(inputs,
     :return:
     '''
     """Generator for v2 (preactivation) ResNet models.
-
     This function generates a family of ResNet v2 models. See the resnet_v2_*()
     methods for specific model instantiations, obtained by selecting different
     block instantiations that produce ResNets of various depths.
-
-
     Args:
       inputs: A tensor of size [batch, height_in, width_in, channels].
       blocks: A list of length equal to the number of ResNet blocks. Each element
@@ -400,8 +360,6 @@ def resnet_v2(inputs,
       reuse: whether or not the network and its variables should be reused. To be
         able to reuse 'scope' must be given.
       scope: Optional variable_scope.
-
-
     Returns:
       net: A rank-4 tensor of size [batch, height_out, width_out, channels_out].
         If global_pool is False, then height_out and width_out are reduced by a
@@ -412,7 +370,6 @@ def resnet_v2(inputs,
         activations.
       end_points: A dictionary from components of the network to the corresponding
         activation.
-
     Raises:
       ValueError: If the target output_stride is not valid.
     """
@@ -443,11 +400,10 @@ def resnet_v2(inputs,
             if num_classes is not None:
                 net = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                                   normalizer_fn=None, scope='logits')
+                net = tf.squeeze(net, [1, 2], name='SpatialSqueeze')
             # Convert end_points_collection into a dictionary of end_points.
             end_points = slim.utils.convert_collection_to_dict(end_points_collection)
             if num_classes is not None:
-                net = tf.squeeze(net, [1, 2], name='SpatialSqueeze')
-                net = slim.fully_connected(net, num_classes, activation_fn=None, scope='result')
                 end_points['predictions'] = slim.softmax(net, scope='predictions')
             return net, end_points
 
@@ -532,7 +488,43 @@ def scheduler(epoch):
     return 0.001
 
 
-batch_size = 32
+class ShowProcess():
+    """
+    显示处理进度的类
+    调用该类相关函数即可实现处理进度的显示
+    """
+    i = 0  # 当前的处理进度
+    max_steps = 0  # 总共需要处理的次数
+    max_arrow = 50  # 进度条的长度
+    infoDone = 'done'
+
+    # 初始化函数，需要知道总共的处理次数
+    def __init__(self, max_steps):
+        self.max_steps = max_steps
+        self.i = 0
+
+    # 显示函数，根据当前的处理进度i显示进度
+    # 效果为[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%
+    def show_process(self, info, i=None):
+        if i is not None:
+            self.i = i
+        else:
+            self.i += 1
+        num_arrow = int(self.i * self.max_arrow / self.max_steps)  # 计算显示多少个'>'
+        num_line = self.max_arrow - num_arrow  # 计算显示多少个'-'
+        percent = self.i * 100.0 / self.max_steps  # 计算完成进度，格式为xx.xx%
+        process_bar = '\r[' + '>' * num_arrow + '-' * num_line + ']' \
+                      + '%.2f' % percent + '%  ' + info  # 带输出的字符串，'\r'表示不换行回到最左边
+        print(process_bar, end='')  # 这两句打印字符到终端
+        if self.i > self.max_steps:
+            self.close()
+
+    def close(self):
+        print("\n")  # 训练完一行记录之后跳转到下一行
+        self.i = 0
+
+
+batch_size = 128
 import numpy as np
 
 (x_train, y_train), (x_test, y_test) = load_data()  # 50000, 32,32,3
@@ -542,24 +534,42 @@ x_train, x_test = color_preprocessing(x_train, x_test)
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
 
-with slim.arg_scope(resnet_arg_scope(is_training=False)):
-    net, end_points = resnet_v2_152(x, 10)  # 分辨率会缩小32倍
+with slim.arg_scope(resnet_arg_scope(is_training=True)):
+    net, end_points = resnet_v2_50(x, 10)  # 分辨率会缩小32倍
 
-y_pred = end_points['predictions']
-cross_entropy = -tf.reduce_sum(y * tf.log(y_pred))
-optimizer = tf.train.AdamOptimizer().minimize(cross_entropy)
-correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
+loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=net))
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+global_step = tf.Variable(0, trainable=False)
+learning_rate = tf.train.exponential_decay(0.1, global_step, 150, 0.96)
+with tf.control_dependencies(update_ops):
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step)
+correct_prediction = tf.equal(tf.argmax(tf.reshape(net, [-1, 10]), 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
 init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
-n_epochs = 5
-
+n_epochs = 200
+iterations = 50000 // batch_size + 1
+p = ShowProcess(iterations)
 for epoch_i in range(n_epochs):
-    train_accuracy = 0
-    for k in range(len(x_train) // batch_size):
-        result = sess.run([optimizer, accuracy],
+    result = None
+    for k in range(iterations):
+        result = sess.run([optimizer, accuracy, loss],
                           feed_dict={x: x_train[k * batch_size:(k + 1) * batch_size],
                                      y: y_train[k * batch_size:(k + 1) * batch_size]})
-        print(result)
+        p.show_process('epoch: {}, step: {}, loss: {}, acc: {}'.format(epoch_i + 1,
+                                                                       k + 1, result[2], round(result[1], 3)), k)
+
+    with slim.arg_scope(resnet_arg_scope(is_training=False)):
+        test_net, test_end_points = resnet_v2_50(x, 10, reuse=True)  # 分辨率会缩小32倍
+    test_correct_prediction = tf.equal(tf.argmax(test_net, 1), tf.argmax(y, 1))
+    test_accuracy = tf.reduce_mean(tf.cast(test_correct_prediction, 'float'))
+    test_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=test_net))
+    test_result = sess.run([test_accuracy, loss], feed_dict={x: x_test, y: y_test})
+    info = "epoch: {}, step:{}, loss: {}, acc: {}, val_loss: {}, val_acc: {}".format(epoch_i + 1, iterations, result[2],
+                                                                                     round(result[1], 3),
+                                                                                     test_result[1],
+                                                                                     round(test_result[0], 3))
+    p.show_process(info, iterations)
+    p.close()
