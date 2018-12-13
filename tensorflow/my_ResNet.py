@@ -186,7 +186,7 @@ BN 算法
 
 def resnet_arg_scope(is_training=True,
                      weight_decay=0.0001,
-                     batch_norm_decay=0.997,
+                     batch_norm_decay=0.9,
                      batch_norm_epsilon=1e-5,
                      batch_norm_scale=True):
     '''
@@ -479,7 +479,21 @@ def color_preprocessing(x_train, x_test):
         x_test[:, :, :, i] = (x_test[:, :, :, i] - mean[i]) / std[i]
     return x_train, x_test
 
-
+def resnet_v2_32(inputs,
+                 num_classes=None,
+                 global_pool=True,
+                 reuse=None,
+                 scope='resnet_v2_32'):
+    """ResNet-32 model of [1]. See resnet_v2() for arg and return description."""
+    blocks = [
+        # scope un_fun  args
+        Block('block1', bottleneck, [(256, 64, 1)] * 2 + [(256, 64, 2)]),
+        Block('block2', bottleneck, [(512, 128, 1)] * 2 + [(512, 128, 2)]),
+        Block('block3', bottleneck, [(1024, 256, 1)] * 2 + [(1024, 256, 2)]),
+        Block('block4', bottleneck, [(2048, 512, 1)] * 3)]
+    return resnet_v2(inputs, blocks, num_classes, global_pool,
+                     include_root_block=True, reuse=reuse, scope=scope)
+  
 def scheduler(epoch):
     if epoch < 81:
         return 0.1
@@ -520,7 +534,7 @@ class ShowProcess():
             self.close()
 
     def close(self):
-        print("\n")  # 训练完一行记录之后跳转到下一行
+        print("\n")
         self.i = 0
 
 
@@ -535,14 +549,14 @@ x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.float32, [None, 10])
 
 with slim.arg_scope(resnet_arg_scope(is_training=True)):
-    net, end_points = resnet_v2_50(x, 10)  # 分辨率会缩小32倍
+    net, end_points = resnet_v2_32(x, 10)  # 分辨率会缩小32倍
 
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=net))
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 global_step = tf.Variable(0, trainable=False)
-learning_rate = tf.train.exponential_decay(0.1, global_step, 150, 0.96)
+learning_rate = tf.train.exponential_decay(0.1, global_step, 4000000, 0.1)
 with tf.control_dependencies(update_ops):
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step)
+    optimizer = tf.train.MomentumOptimizer(learning_rate, momentum=0.9, use_nesterov=True).minimize(loss, global_step)
 correct_prediction = tf.equal(tf.argmax(tf.reshape(net, [-1, 10]), 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
@@ -554,22 +568,31 @@ iterations = 50000 // batch_size + 1
 p = ShowProcess(iterations)
 for epoch_i in range(n_epochs):
     result = None
+    average_result = 0.0
+    average_loss = 0.0
     for k in range(iterations):
         result = sess.run([optimizer, accuracy, loss],
                           feed_dict={x: x_train[k * batch_size:(k + 1) * batch_size],
                                      y: y_train[k * batch_size:(k + 1) * batch_size]})
+        average_result += result[1]
+        average_loss += result[2]
         p.show_process('epoch: {}, step: {}, loss: {}, acc: {}'.format(epoch_i + 1,
                                                                        k + 1, result[2], round(result[1], 3)), k)
-
+    average_result /= iterations
+    average_loss /= iterations
     with slim.arg_scope(resnet_arg_scope(is_training=False)):
-        test_net, test_end_points = resnet_v2_50(x, 10, reuse=True)  # 分辨率会缩小32倍
+        test_net, test_end_points = resnet_v2_32(x, 10, reuse=True)
     test_correct_prediction = tf.equal(tf.argmax(test_net, 1), tf.argmax(y, 1))
     test_accuracy = tf.reduce_mean(tf.cast(test_correct_prediction, 'float'))
     test_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=test_net))
-    test_result = sess.run([test_accuracy, loss], feed_dict={x: x_test, y: y_test})
-    info = "epoch: {}, step:{}, loss: {}, acc: {}, val_loss: {}, val_acc: {}".format(epoch_i + 1, iterations, result[2],
-                                                                                     round(result[1], 3),
-                                                                                     test_result[1],
-                                                                                     round(test_result[0], 3))
+    test_result = sess.run([test_accuracy, loss], feed_dict={x: x_test[:5000], y: y_test[:5000]})
+    info = "epoch: {}, step:{}, average-loss: {}, average-acc: {}, val_loss: {}, val_acc: {}".format(epoch_i + 1,
+                                                                                                     iterations,
+                                                                                                     average_loss,
+                                                                                                     average_result,
+                                                                                                     test_result[1],
+                                                                                                     round(
+                                                                                                         test_result[0],
+                                                                                                         3))
     p.show_process(info, iterations)
     p.close()
