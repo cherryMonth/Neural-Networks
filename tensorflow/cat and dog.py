@@ -35,7 +35,8 @@ import numpy as np
 from keras.preprocessing import image
 
 test_image = image.load_img('input/test_set/dogs/dog.4001.jpg', target_size=(64, 64))
-test_image = image.img_to_array(test_image)
+# 此处也需要归一化
+test_image = image.img_to_array(test_image) / 255
 test_image = np.expand_dims(test_image, axis=0)
 result = model.predict(test_image)
 print(training_set.class_indices)
