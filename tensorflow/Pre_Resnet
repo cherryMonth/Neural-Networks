@@ -1,0 +1,370 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "Untitled9.ipynb",
+      "version": "0.3.2",
+      "provenance": [],
+      "collapsed_sections": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "accelerator": "GPU"
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/cherryMonth/Neural-Networks/blob/master/tensorflow/Pre_Resnet\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "metadata": {
+        "id": "ExLePCFJRZM8",
+        "colab_type": "code",
+        "outputId": "8f1184a9-8cf5-49b3-e6dd-e30404666201",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 210
+        }
+      },
+      "cell_type": "code",
+      "source": [
+        "! wget http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "--2019-01-30 02:56:10--  http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz\n",
+            "Resolving download.tensorflow.org (download.tensorflow.org)... 74.125.197.128, 2607:f8b0:400e:c03::80\n",
+            "Connecting to download.tensorflow.org (download.tensorflow.org)|74.125.197.128|:80... connected.\n",
+            "HTTP request sent, awaiting response... 200 OK\n",
+            "Length: 95073259 (91M) [application/x-tar]\n",
+            "Saving to: ‘resnet_v1_50_2016_08_28.tar.gz’\n",
+            "\n",
+            "\r          resnet_v1   0%[                    ]       0  --.-KB/s               \r         resnet_v1_  27%[====>               ]  24.91M   125MB/s               \r        resnet_v1_5  70%[=============>      ]  64.01M   158MB/s               \rresnet_v1_50_2016_0 100%[===================>]  90.67M   184MB/s    in 0.5s    \n",
+            "\n",
+            "2019-01-30 02:56:11 (184 MB/s) - ‘resnet_v1_50_2016_08_28.tar.gz’ saved [95073259/95073259]\n",
+            "\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "8GMir0WeN1YO",
+        "colab_type": "code",
+        "outputId": "5f83cc9b-8303-4086-8cca-e82b929af123",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 34
+        }
+      },
+      "cell_type": "code",
+      "source": [
+        "! tar zxvf resnet_v1_50_2016_08_28.tar.gz"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "resnet_v1_50.ckpt\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "09HO3l1fQtAh",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "cell_type": "code",
+      "source": [
+        "! mkdir -p new_model"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "id": "ZuXdKwYc7X4O",
+        "colab_type": "code",
+        "outputId": "053bfecf-a7d5-4c8f-e719-375923e4a07d",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 34
+        }
+      },
+      "cell_type": "code",
+      "source": [
+        "import tensorflow as tf\n",
+        "import keras\n",
+        "from tensorflow.contrib.slim import nets\n",
+        "import numpy as np\n",
+        "\n",
+        "slim = tf.contrib.slim\n",
+        "from keras.datasets.cifar10 import load_data\n",
+        "\n",
+        "def color_preprocessing(x_train, x_test):\n",
+        "    x_train = x_train.astype('float32')\n",
+        "    x_test = x_test.astype('float32')\n",
+        "    mean = [125.307, 122.95, 113.865]\n",
+        "    std = [62.9932, 62.0887, 66.7048]\n",
+        "    for i in range(3):\n",
+        "        x_train[:, :, :, i] = (x_train[:, :, :, i] - mean[i]) / std[i]\n",
+        "        x_test[:, :, :, i] = (x_test[:, :, :, i] - mean[i]) / std[i]\n",
+        "    return x_train, x_test\n",
+        "\n",
+        "class ShowProcess():\n",
+        "    \"\"\"\n",
+        "    显示处理进度的类\n",
+        "    调用该类相关函数即可实现处理进度的显示\n",
+        "    \"\"\"\n",
+        "    i = 0  # 当前的处理进度\n",
+        "    max_steps = 0  # 总共需要处理的次数\n",
+        "    max_arrow = 50  # 进度条的长度\n",
+        "    infoDone = 'done'\n",
+        "\n",
+        "    # 初始化函数，需要知道总共的处理次数\n",
+        "    def __init__(self, max_steps):\n",
+        "        self.max_steps = max_steps\n",
+        "        self.i = 0\n",
+        "\n",
+        "    # 显示函数，根据当前的处理进度i显示进度\n",
+        "    # 效果为[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%\n",
+        "    def show_process(self, info, i=None):\n",
+        "        if i is not None:\n",
+        "            self.i = i\n",
+        "        else:\n",
+        "            self.i += 1\n",
+        "        num_arrow = int(self.i * self.max_arrow / self.max_steps)  # 计算显示多少个'>'\n",
+        "        num_line = self.max_arrow - num_arrow  # 计算显示多少个'-'\n",
+        "        percent = self.i * 100.0 / self.max_steps  # 计算完成进度，格式为xx.xx%\n",
+        "        process_bar = '\\r[' + '>' * num_arrow + '-' * num_line + ']' \\\n",
+        "                      + '%.2f' % percent + '%  ' + info  # 带输出的字符串，'\\r'表示不换行回到最左边\n",
+        "        print(process_bar, end='')  # 这两句打印字符到终端\n",
+        "        if self.i > self.max_steps:\n",
+        "            self.close()\n",
+        "\n",
+        "    def close(self):\n",
+        "        print(\"\\n\")  # 训练完一行记录之后跳转到下一行\n",
+        "        self.i = 0\n",
+        "\n",
+        "n_epochs = 200\n",
+        "batch_size = 128\n",
+        "iterations = 50000 // batch_size + 1\n",
+        "\n",
+        "(x_train, y_train), (x_test, y_test) = load_data()  # 50000, 32,32,3\n",
+        "y_train = np.array(keras.utils.to_categorical(y_train, 10).tolist())\n",
+        "y_test = np.array(keras.utils.to_categorical(y_test, 10).tolist())\n",
+        "x_train, x_test = color_preprocessing(x_train, x_test)\n",
+        "x = tf.placeholder(tf.float32, [None, 32, 32, 3])\n",
+        "y = tf.placeholder(tf.float32, [None, 10])\n",
+        "is_training = tf.placeholder(tf.bool, shape=[])\n",
+        "p = ShowProcess(iterations)\n",
+        "\n",
+        "# Specify which gpu to be used\n",
+        "\n",
+        "resnet_model_path = 'resnet_v1_50.ckpt'  # Path to the pretrained model\n",
+        "model_save_path = 'new_model/model'  # 命名规则是路径名 + 模型名称\n",
+        "\n",
+        "is_training = tf.placeholder(tf.bool, name='is_training')\n",
+        "\n",
+        "with slim.arg_scope(nets.resnet_v1.resnet_arg_scope()):\n",
+        "    net, endpoints = nets.resnet_v1.resnet_v1_50(x, num_classes=None, is_training=is_training)\n",
+        "    \n",
+        "net = slim.conv2d(net, 10, [1, 1], activation_fn=None, normalizer_fn=None, scope='fc')\n",
+        "net = tf.squeeze(net, [1, 2], name=\"SpatialSqueeze\")"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Using TensorFlow backend.\n"
+          ],
+          "name": "stderr"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "g0TZArP78ivt",
+        "colab_type": "code",
+        "outputId": "3acfe675-a7c2-42ac-a03a-359caee1e0d8",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 917
+        }
+      },
+      "cell_type": "code",
+      "source": [
+        "checkpoint_exclude_scopes = 'Logits'\n",
+        "exclusions = None\n",
+        "if checkpoint_exclude_scopes:\n",
+        "  exclusions = [\n",
+        "      scope.strip() for scope in checkpoint_exclude_scopes.split(',')]\n",
+        "variables_to_restore = []\n",
+        "for var in slim.get_model_variables():\n",
+        "  excluded = False\n",
+        "  for exclusion in exclusions:\n",
+        "      if var.op.name.startswith(exclusion):\n",
+        "          excluded = True\n",
+        "  if not excluded and var.op.name not in ['fc/weights', 'fc/biases']:  # 下载的模型不含有这两个参数，很奇怪,所以如果要使用模型，就需要把这两个参赛去掉\n",
+        "      variables_to_restore.append(var)\n",
+        "\n",
+        "loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=net))\n",
+        "\n",
+        "accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net, 1), tf.argmax(y, 1)), dtype=tf.float32))\n",
+        "\n",
+        "update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)\n",
+        "\n",
+        "with tf.control_dependencies(update_ops):\n",
+        "  optimizer = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(loss)\n",
+        "\n",
+        "from keras.preprocessing.image import ImageDataGenerator\n",
+        "\n",
+        "datagen = ImageDataGenerator(\n",
+        "    featurewise_center=True,\n",
+        "    featurewise_std_normalization=True,\n",
+        "    rotation_range=20,\n",
+        "    width_shift_range=0.2,\n",
+        "    height_shift_range=0.2,\n",
+        "    horizontal_flip=True)\n",
+        "\n",
+        "datagen.fit(x_train)\n",
+        "\n",
+        "init = tf.global_variables_initializer()\n",
+        "\n",
+        "saver_restore = tf.train.Saver(var_list=variables_to_restore)\n",
+        "\n",
+        "# config = tf.ConfigProto(allow_soft_placement = True) \n",
+        "# config.gpu_options.per_process_gpu_memory_fraction = 0.95\n",
+        "\n",
+        "with tf.Session() as sess:\n",
+        "    sess.run(init)\n",
+        "\n",
+        "    # Load the pretrained checkpoint file xxx.ckpt\n",
+        "    saver_restore.restore(sess, resnet_model_path)\n",
+        "\n",
+        "    for epoch_i in range(n_epochs):\n",
+        "      result = None\n",
+        "      average_result = 0.0\n",
+        "      average_loss = 0.0\n",
+        "      count = 0\n",
+        "      k = 0\n",
+        "      for x_batch, y_batch in datagen.flow(x_train, y_train, batch_size=batch_size):\n",
+        "          result = sess.run([optimizer, accuracy, loss], feed_dict={x: x_batch, y: y_batch, is_training: True})\n",
+        "          average_result += result[1]\n",
+        "          average_loss += result[2]\n",
+        "          p.show_process('epoch: {}, step: {}, loss: {:.3f}, acc: {:.2f}'.format(epoch_i + 1,\n",
+        "                                                                                 k + 1, result[2], result[1], 3), k)\n",
+        "          k += 1\n",
+        "          if k == iterations: break\n",
+        "\n",
+        "      average_result /= iterations\n",
+        "      average_loss /= iterations\n",
+        "      if epoch_i % 10 == 0:\n",
+        "          saver = tf.train.Saver(tf.global_variables())\n",
+        "          save_path = saver.save(sess, model_save_path)\n",
+        "      index = np.random.randint(10000, size=(1000,))\n",
+        "      result = sess.run([accuracy, loss], feed_dict={x: x_test[index], y: y_test[index], is_training: False})\n",
+        "      info = \"epoch: {}, step:{}, average-loss: {:.3f}, average-acc: {:.2f}, val_loss: {:.3f}, val_acc: {:.2f}\".format(\n",
+        "          epoch_i,\n",
+        "          k + 1,\n",
+        "          average_loss,\n",
+        "          average_result,\n",
+        "          result[1],\n",
+        "          result[0])\n",
+        "      p.show_process(info, iterations)\n",
+        "      p.close()"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "WARNING:tensorflow:From <ipython-input-2-32975facaaec>:15: softmax_cross_entropy_with_logits (from tensorflow.python.ops.nn_ops) is deprecated and will be removed in a future version.\n",
+            "Instructions for updating:\n",
+            "\n",
+            "Future major versions of TensorFlow will allow gradients to flow\n",
+            "into the labels input on backprop by default.\n",
+            "\n",
+            "See `tf.nn.softmax_cross_entropy_with_logits_v2`.\n",
+            "\n",
+            "INFO:tensorflow:Restoring parameters from resnet_v1_50.ckpt\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 0, step:392, average-loss: 1.545, average-acc: 0.49, val_loss: 3.531, val_acc: 0.08\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 1, step:392, average-loss: 0.948, average-acc: 0.67, val_loss: 3.669, val_acc: 0.09\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 2, step:392, average-loss: 0.790, average-acc: 0.72, val_loss: 3.699, val_acc: 0.12\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 3, step:392, average-loss: 0.692, average-acc: 0.76, val_loss: 2.749, val_acc: 0.24\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 4, step:392, average-loss: 0.628, average-acc: 0.78, val_loss: 1.562, val_acc: 0.50\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 5, step:392, average-loss: 0.580, average-acc: 0.80, val_loss: 0.896, val_acc: 0.71\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 6, step:392, average-loss: 0.532, average-acc: 0.81, val_loss: 0.570, val_acc: 0.81\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 7, step:392, average-loss: 0.501, average-acc: 0.82, val_loss: 0.627, val_acc: 0.79\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 8, step:392, average-loss: 0.471, average-acc: 0.83, val_loss: 0.551, val_acc: 0.81\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 9, step:392, average-loss: 0.451, average-acc: 0.84, val_loss: 0.512, val_acc: 0.83\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 10, step:392, average-loss: 0.429, average-acc: 0.85, val_loss: 0.645, val_acc: 0.79\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 11, step:392, average-loss: 0.401, average-acc: 0.86, val_loss: 0.719, val_acc: 0.78\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 12, step:392, average-loss: 0.385, average-acc: 0.87, val_loss: 0.608, val_acc: 0.81\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 13, step:392, average-loss: 0.373, average-acc: 0.87, val_loss: 0.532, val_acc: 0.83\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 14, step:392, average-loss: 0.350, average-acc: 0.88, val_loss: 0.519, val_acc: 0.83\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 15, step:392, average-loss: 0.342, average-acc: 0.88, val_loss: 0.582, val_acc: 0.83\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 16, step:392, average-loss: 0.327, average-acc: 0.88, val_loss: 0.568, val_acc: 0.81\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 17, step:392, average-loss: 0.310, average-acc: 0.89, val_loss: 0.648, val_acc: 0.81\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 18, step:392, average-loss: 0.301, average-acc: 0.89, val_loss: 0.626, val_acc: 0.82\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]100.00%  epoch: 19, step:392, average-loss: 0.287, average-acc: 0.90, val_loss: 0.588, val_acc: 0.82\n",
+            "\n",
+            "[>>>>>>>>>>>>>>>>>>>-------------------------------]38.62%  epoch: 21, step: 152, loss: 0.283, acc: 0.91"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "UNnvweQk5PWd",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "cell_type": "code",
+      "source": [
+        ""
+      ],
+      "execution_count": 0,
+      "outputs": []
+    }
+  ]
+}
